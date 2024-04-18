@@ -1,0 +1,48 @@
+{
+  "name": "vue-smart-intrusion-detection",
+  "version": "0.0.0",
+  "private": true,
+  "description": "",
+  "author": "",
+  "scripts": {
+    "serve": "vue-cli-service serve --open",
+    "build": "vue-cli-service build",
+    "e2e": "node test/e2e/runner.js",
+    "lint": "vue-cli-service lint",
+    "dev": "vue-cli-service serve --open",
+    "lint-fix": "vue-cli-service lint --fix",
+    "prettify": "prettier --write ."
+  },
+  "dependencies": {
+    "bootstrap": "^5.3.3",
+    "bootstrap-vue": "^2.23.1",
+    "chart.js": "2.9.4",
+    "eslint-plugin-vue": "9.11.0",
+    "register-service-worker": "^1.7.2",
+    "vue": "2.7.14",
+    "vue-chartjs": "3.5.1",
+    "vue-router": "3.6.5",
+    "vue-router-prefetch": "1.6.3",
+    "vue2-transitions": "0.3.0"
+  },
+  "devDependencies": {
+    "@babel/eslint-parser": "7.21.8",
+    "@vue/cli-plugin-babel": "5.0.8",
+    "@vue/cli-plugin-eslint": "5.0.8",
+    "@vue/cli-plugin-pwa": "5.0.8",
+    "@vue/cli-service": "5.0.8",
+    "@vue/eslint-config-prettier": "7.1.0",
+    "eslint": "8.41.0",
+    "eslint-plugin-prettier": "4.2.1",
+    "eslint-plugin-vue": "9.14.1",
+    "prettier": "2.8.8",
+    "sass": "1.62.1",
+    "sass-loader": "10.2.0",
+    "vue-template-compiler": "2.7.14"
+  },
+  "browserslist": [
+    "> 1%",
+    "last 2 versions",
+    "not ie <= 11"
+  ]
+}

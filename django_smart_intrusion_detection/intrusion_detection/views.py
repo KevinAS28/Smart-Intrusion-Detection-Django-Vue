@@ -1,6 +1,7 @@
 import time
 import os
 import json
+import base64
 
 import cv2
 
@@ -8,13 +9,36 @@ from django.conf import settings
 from django.shortcuts import render
 from django.http import HttpResponse, StreamingHttpResponse, JsonResponse
 from django.forms.models import model_to_dict
+from django.contrib.staticfiles.storage import staticfiles_storage
 
 from intrusion_detection.models import *
 from intrusion_detection.video_source import *
-from intrusion_detection.rtdetr import RTDETROnnxDeploy
+from intrusion_detection.rtdetr import RTDETROnnxDeploy, is_bbox_intersection, line_to_box
 from token_authentication.auth_core import token_auth
 from token_authentication import models as ta_models
 
+def custom_object_warnings(frame, lines, all_slb, objects_to_warn=['person'], invert=False, user=None):
+    print('custom_object_warnings(0):', lines, objects_to_warn)
+    all_crossed_objects = []
+    for s, l, b in all_slb:
+      for ln in lines:
+          ln_type, ln = ln[0], ln[1:]    
+          ln_bbox = line_to_box(ln, frame.shape, line_type=ln_type, invert=invert) 
+          print('custom_object_warnings(1):', l, b, ln_bbox, objects_to_warn, l in objects_to_warn, is_bbox_intersection(b, ln_bbox))
+          obj_crossed = False
+          if l in objects_to_warn:
+              obj_crossed = is_bbox_intersection(b, ln_bbox)
+              if obj_crossed:
+                print(f'WARNING: OBJECT {l} HAS CROSSED THE LINE')      
+                all_crossed_objects.append(l)
+
+    if len(all_crossed_objects)>0:
+        existing_warn_notif = WarningNotification.objects.filter(user=user)
+        if len(existing_warn_notif)==0:
+            frame_path = os.path.join(settings.MEDIA_DIR_PATH, f'{user.username}_{str(time.time())}.jpg')
+            cv2.imwrite(frame_path, frame)        
+            warn_notif = WarningNotification(user=user, objs=','.join(all_crossed_objects), frame_path=frame_path)        
+            warn_notif.save()
 
 rtdetr_model = None
 if (settings.DEBUG and settings.ISRUNNING_DEVSERVER) or not settings.DEBUG:    
@@ -43,19 +67,23 @@ def update_dict(dict0, dict1):
 def video_stream(user:ta_models.UserAuthentication, request):
     if not (user.username in user_models):
         user_models[user.username] = default_rtdetr_model
-        
+    
     inference_settings = InferenceSettings.objects.filter(user=user)
     if len(inference_settings)==0:
         inference_settings = InferenceSettings(user=user)         
     else:
         inference_settings = inference_settings[0]
-    user_model = update_dict(user_models[user.username], model_to_dict(inference_settings))
-
+        
     home_settings = HomeSettings.objects.filter(user=user)
     if len(home_settings)==0:
         home_settings = HomeSettings(user=user)    
     else:
         home_settings = home_settings[0]
+                
+    user_model = update_dict(user_models[user.username], model_to_dict(inference_settings))
+    print(f'Model settings for {user.username}:', user_models[user.username].get_parameters())
+    user_model.obj_warning = lambda frame, all_slb: custom_object_warnings(frame=frame, lines=inference_settings.get_lines(orient=True), all_slb=all_slb, objects_to_warn=inference_settings.objects_to_warn, invert=inference_settings.get_line_invert(), user=user)    
+
     video_path = str(home_settings.video_file)
     if not os.path.isfile(video_path):
         video_source = NotFoundSource(text=f'Please choose a video file',size=inference_settings.size)
@@ -88,6 +116,7 @@ def update_settings(user, request):
                 for chunk in uploaded_file.chunks():
                     destination.write(chunk)  
             home_settings.video_file = video_path 
+        
     home_settings.save()                     
     
     # handle update inference settings
@@ -101,10 +130,12 @@ def update_settings(user, request):
         del new_settings['inference']['model_name']
     new_inference_settings = {k:v for k,v in new_settings['inference'].items() if not (v is None)}
     inference_settings = update_dict(inference_settings, new_inference_settings)
-    user_models[user.username].update_parameters(new_inference_settings)   
     inference_settings.save()
+    user_models[user.username].update_parameters(new_inference_settings)   
+    user_models[user.username].obj_warning = lambda frame, all_slb: custom_object_warnings(frame=frame, lines=inference_settings.get_lines(orient=True), all_slb=all_slb, objects_to_warn=inference_settings.objects_to_warn, invert=inference_settings.get_line_invert(), user=user)    
     
-    print('updated inference params:', user_models[user.username].get_parameters())
+    print('updated inference ML model params:', user_models[user.username].get_parameters())
+    print('updated inference DB model ', model_to_dict(inference_settings))
     
     print('done')
     return JsonResponse({'status': 'ok'})
@@ -127,5 +158,35 @@ def get_user_settings(user, request):
         'inference_settings': inference_settings
     }
     return JsonResponse(settings)
-    
-# Create your views here.
+
+def custom_model2todict(model, request=None, files=[], statics=[], hiddens=['created_at', 'updated_at']):
+    model_dict = model_to_dict(model)
+    for fa in files:
+        if os.path.isfile(fa):
+            with open(fa, 'rb') as file:
+                model_dict[fa] = base64.b64encode(file.read()).decode("utf-8")
+    for hid in hiddens:
+        model_dict[hid] = getattr(model, hid)
+    for stat in statics:
+        # print(request.scheme, request.get_host(), settings.MEDIA_DIR, getattr(model, stat))
+        model_dict[stat] =  f"{request.scheme}://{request.get_host()}{os.path.join(settings.MEDIA_DIR, getattr(model, os.path.basename(stat)))}"
+    return model_dict
+
+@token_auth(roles=['*'], get_user=True)
+def get_status(user, request):
+    all_warnings = WarningNotification.objects.filter(user=user)
+    all_status = {
+        'warnings': [custom_model2todict(model=model, request=request, statics=['frame_path']) for model in all_warnings],
+        
+    }
+    return JsonResponse(all_status)
+
+@token_auth(roles=['*'], get_user=True)
+def clear_obj_warning(user, request):
+    all_warnings = WarningNotification.objects.filter(user=user)
+    for warn in all_warnings:
+        frame_path = warn.frame_path
+        if os.path.isfile(frame_path):
+            os.remove(frame_path)
+        warn.delete()
+    return JsonResponse({'deleted': len(all_warnings)})

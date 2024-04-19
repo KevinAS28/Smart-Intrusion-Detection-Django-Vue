@@ -16,9 +16,11 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path, include
+from django.conf import settings
+from django.conf.urls.static import static
 
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('intrusion-detection/', include('intrusion_detection.urls')),
     path('token-authentication/', include('token_authentication.urls', namespace='token_authentication_ns'))    
-]
+] + static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)

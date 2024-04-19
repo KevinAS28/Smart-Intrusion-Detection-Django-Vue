@@ -1,6 +1,7 @@
 import os
 import time
 import json
+from threading import Thread
 
 import cv2
 import torch
@@ -26,27 +27,29 @@ def isjson(json_content):
     except json.JSONDecodeError:
         return False
     
-
-
 def line_to_box(line, img_shape, line_type='h', invert=False):
+  print('line2bbox 0:', line, line_type)
   line = list(line)
   if line_type=='h':
-    if not invert:
+    if not invert: # [0, 400]
       line.append(img_shape[0])
-      line.append(img_shape[1])
-    else:
-      line.append(0)
-      line.append(0)
+      line.append(img_shape[1]) # [0, 400, 640, 640]
+    else: # [0, 400]
+      line = [0, line[0], img_shape[0], line[1]] # [0, 0, 400, 640]
   elif line_type=='v':
-    if not invert:
-      line.append(img_shape[0])
-      line.append(img_shape[1])
+    if not invert: # [400, 0]
+      line.append(img_shape[0]) 
+      line.append(img_shape[1]) # [400]
     else:
-      line.append(0)
-      line.append(img_shape[0])
-      
+      line = [0, 0, line[0], img_shape[1]] # [0, 0, 400, 640]
   else:
     raise ValueError(f'Line type {line_type} is not supported')  
+  
+  print('line2bbox 1:', line)
+  x1, y1, x2, y2 = line # 640, 0, 0, 640 | 0, 300, 200, 0
+  if x1>x2 or y1>y2:
+    return [x2, y2, x1, y1]  # Swap coords
+  print('line2bbox 2:', line)
   return line
                                
 def rectangles_intersect(rect0, rect1, invert=False):
@@ -65,28 +68,12 @@ def rectangles_intersect(rect0, rect1, invert=False):
 
   return not result if invert else result
 
-def obj_crossed_line(obj_bbox, line, line_type='h', invert=False):
-  def _algo():
-    points = [obj_bbox[:2], obj_bbox[2:4], [obj_bbox[2], obj_bbox[1]], [obj_bbox[0], obj_bbox[3]]]
-
-    # check vertical
-    if line_type=='v':
-      for pt in points:
-        if pt[0]>line[0]:
-          return True
-      return False
-    
-    elif line_type=='h':
-      for pt in points:
-        if pt[1]>line[1]:
-          return True
-      
-      return False
-    
-    else:
-      raise 'line not supported'
-
-  return _algo() and not invert
+def is_bbox_intersection(bbox1, bbox2):
+  if bbox2[0] > bbox1[2] or bbox1[0] > bbox2[2]:
+    return False
+  if bbox2[1] > bbox1[3] or bbox1[1] > bbox2[3]:
+    return False 
+  return True
 
 def add_overlay(img, rect, channel_index, color_value, alpha=0.5, invert=False):
     start_w, start_h, end_w, end_h = rect
@@ -113,22 +100,26 @@ def add_overlay(img, rect, channel_index, color_value, alpha=0.5, invert=False):
 def frame_overlay(lines, frame, invert=False):
     for ln in lines:
         ln_type, ln = ln[0], ln[1:]
+        print('frame_overlay line:', ln)
         ln_bx = line_to_box(ln, frame.shape, ln_type, False)
         frame = add_overlay(frame, ln_bx, 0, 255, 0.25, invert)
 
     return frame
 
-def object_warnings(lines, s, l, b, objects_to_warn=['person'], invert=False):
-    for ln in lines:
-        ln_type, ln = ln[0], ln[1:]    
-        obj_crossed = False
-        if l in objects_to_warn:
-            obj_crossed = obj_crossed_line(b, ln, ln_type, invert)
-            if obj_crossed:
-                print(f'WARNING: OBJECT {l} HAS CROSSED THE LINE')      
+def object_warnings(frame, lines, all_slb, objects_to_warn=['person'], invert=False):
+    for s, l, b in all_slb:
+      for ln in lines:
+          ln_type, ln = ln[0], ln[1:]   
+          print('objects_warning line:', ln)
+          ln_bbox = line_to_box(ln, frame.shape, line_type=ln_type, invert=invert) 
+          obj_crossed = False
+          if l in objects_to_warn:
+              obj_crossed = is_bbox_intersection(b, ln_bbox)
+              if obj_crossed:
+                  print(f'WARNING: OBJECT {l} HAS CROSSED THE LINE')      
 
 class RTDETROnnxDeploy(object):
-    def __init__(self, model_path, size=640, classes_labels='inference_class_labels.json', encoder='XVID', thrh=0.65, out_video_path='', draw_obj_name=True, draw_obj_conf=True, overlay='h_0_450_0', objects_to_warn=['person', 'bicycle'], sample_img=None):
+    def __init__(self, model_path, size=640, classes_labels='inference_class_labels.json', encoder='XVID', thrh=0.65, out_video_path='', draw_obj_name=True, draw_obj_conf=True, overlay='h_0_450_0', objects_to_warn=['person', 'bicycle'], obj_warning_func=object_warnings, sample_img=None):
         self.model_path = model_path
         self.size = size
         self.classes_labels = classes_labels
@@ -136,12 +127,12 @@ class RTDETROnnxDeploy(object):
         self.out_video_path = out_video_path
         self.draw_obj_name = draw_obj_name
         self.draw_obj_conf = draw_obj_conf
-        self.objects_to_warn = objects_to_warn
+        self.__objects_to_warn = objects_to_warn
         
         self.set_classes_labels(classes_labels)      
         self.set_overlay_line(overlay)
         self.set_additional_postprocessor(self.lines, self.invert_line)
-        self.set_obj_warning(objects_to_warn)
+        self.set_obj_warning(objects_to_warn, obj_warning_func)
         self.set_inference_engine('onnx')
         self.set_model(model_path)
 
@@ -168,6 +159,7 @@ class RTDETROnnxDeploy(object):
         if not (sample_img is None):
           self.inference_frame(sample_img)
         
+    
     def inference_frame(self, frame):
         frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         preprocessed_frame = self.preprocess_transformations(frame)
@@ -188,7 +180,7 @@ class RTDETROnnxDeploy(object):
         scr = scores[img_index]
         lab = labels[img_index]
         boxes = boxes[img_index]        
-        
+        all_slb = []
         if len(lab)>0:
             for s, l, b in zip(scr, lab, boxes):
                 if s<=self.thrh:
@@ -206,9 +198,9 @@ class RTDETROnnxDeploy(object):
                 # if type(self.obj_warning) is str:
                 #   print("OBJ WARNING: ", self.obj_warning)
                 # else:
-                self.obj_warning(s, lab_str, b)
+                all_slb.append([s, lab_str, b])
                 self.detected_class_frame[self.classes_labels[l]] += 1        
-                                            
+        Thread(target=self.obj_warning, args=(postprocessed_frame, all_slb)).start()        
         postprocessed_frame = cv2.putText(postprocessed_frame, f"FPS: {self.fps:.2f}", (50,50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)  
         # if self.save_video_output:
         #     self.video_writer.write(postprocessed_frame)        
@@ -245,12 +237,24 @@ class RTDETROnnxDeploy(object):
     
         return self
     
-    def set_obj_warning(self, objects_to_warn):
-        if type(objects_to_warn)==str:
-            self.objects_to_warn = objects_to_warn.split(',')
+    @property
+    def objects_to_warn(self):
+        return self.__objects_to_warn
+    
+    @objects_to_warn.setter
+    def objects_to_warn(self, val):
+        if val is None:
+            pass # no need to change objects_to_warn
+        if type(val)==str:
+            self.__objects_to_warn = val.split(',')
+        elif type(val)==list:
+            self.objects_to_warn = val
         else:
-            self.objects_to_warn = objects_to_warn
-        self.obj_warning = lambda s,l,b: object_warnings(self.lines, s, l, b, objects_to_warn, invert=self.invert_line)        
+            raise ValueError(f'objects_to_warn.setter: Unknown type objects_to_warn: ', val)      
+      
+    def set_obj_warning(self, objects_to_warn=None, obj_warning_func=object_warnings):
+
+        self.obj_warning = lambda frame, all_slb: obj_warning_func(frame=frame, lines=self.lines, all_slb=all_slb, objects_to_warn=objects_to_warn, invert=self.invert_line)        
         
     def set_model(self, model_path):
         print(f'Loading the model from {model_path}')

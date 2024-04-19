@@ -137,10 +137,16 @@ CORS_ORIGIN_WHITELIST = (
        'http://localhost:8081',
 )
 
-MEDIA_DIR_PATH = os.path.join(BASE_DIR, 'tmp')
+MEDIA_DIR = 'tmp'
+MEDIA_DIR_PATH = os.path.join(BASE_DIR, MEDIA_DIR)
 if not os.path.isdir(MEDIA_DIR_PATH):
     os.makedirs(MEDIA_DIR_PATH)
-    
+
+STATICFILES_DIRS = [
+    BASE_DIR / "static",
+    MEDIA_DIR_PATH
+]
+
 ISRUNNING_DEVSERVER = (len(sys.argv) > 1 and sys.argv[1] == 'runserver')
 
 INTRUSION_DETECTION_MODELS = {

@@ -1,5 +1,8 @@
 <template>
   <div>
+    <b-alert show dismissible @dismissed="closeNotification" v-model="showNotification"  variant="info"  style="position:fixed;z-index: 1;color:white; background-color:rgba(217,67,85,1)" >
+        {{ notificationText }}
+    </b-alert>
     <div class="row">
       <div class="col-12">
         <card type="chart">
@@ -86,8 +89,6 @@
           </div> -->
         </card>
       </div>
-
-      
       
       <div class="col-lg-4" :class="{ 'text-right': isRTL }">
         <card type="chart">
@@ -147,6 +148,8 @@
                 />
             </div>
             <hr style="position:relative;margin-top: 25px; margin-bottom: 25px;height:1px;background-color: white;" />
+            <b-form-input v-model="objects_to_warn" :id="`type-text`" type="text"
+                  style="width: 50%;text-align:center; position:relative; display: block; margin-left: auto; margin-right: auto; background-color:rgba(0,0,0,0);"></b-form-input>            
           </div>
         </card>
       </div>
@@ -203,6 +206,10 @@ export default {
       camImageHeight: this.camInitialHeight,
       camIsMinZoom: false,
       modelListItems: [],
+
+      notificationText: "Nothing",
+      showNotification: false,
+
       line_orientation_list: [{"id": 1, "name": "Horizontal"}, {"id": 2, "name": "Vertical"}],
       newSettings: {
         'inference': {
@@ -224,8 +231,8 @@ export default {
       point1Y: 450,
       point2X: 640,
       point2Y: 450,
-      line_orientation: 'Horizontal',
-      last_settings_updated: Date.now()
+      last_settings_updated: Date.now(),
+      objects_to_warn: 'person,bicycle'
     };
   },
   computed: {
@@ -236,6 +243,7 @@ export default {
       return this.$rtl.isRTL;
     },
   },
+
   methods: {
     getInput(group, key, value) {
       if (group=="file"){
@@ -257,46 +265,21 @@ export default {
       this.camImageHeight /= this.camZoomFactor;
       this.camIsMinZoom = this.camImageWidth <= this.minZoom || this.camImageHeight <= this.camMinZoom;
     },
-    async formHitAPI(url, body, key) {
-      try {
-        const response = await fetch(url); // Replace with your API URL
-        const data = await response.json();
-        this.dynamic[key] = data;
-      } catch (error) {
-        this.dynamic[key] = error;
-        console.error('Error fetching data:', error);
-        // Handle errors appropriately, e.g., display an error message to the user
-      }
-    },
+
     updateSettings() {
       const formData = new FormData();
 
-      let line = `${this.line_orientation[0].toLowerCase()}_${this.point1X}_${this.point1Y}_${this.newSettings["inference"]["invert_line"]}`;
-      this.newSettings["inference"]["overlay_line"] = line;
+      let line = `${this.newSettings["inference"]["line_orientation"][0].toLowerCase()}_${this.point1X}_${this.point1Y}_${this.newSettings["inference"]["invert_line"]}`;
       console.log("line", line);
+      this.newSettings["inference"]["overlay_line"] = line;
+      this.newSettings["inference"]["objects_to_warn"] = this.objects_to_warn;
+      
       
       formData.append("new_settings", JSON.stringify(this.newSettings));  
       for (const [key, value] of Object.entries(this.newFiles)) {
         console.log("adding file " + key + " to form");
         formData.append(key, value);  
       }
-
-      // const headers = new Headers();
-      // headers.append('Content-Type', 'multipart/form-data; boundary=---------------------------77135198018380622703317445938');
-      // headers.append('Host', 'localhost:8001');
-      // headers.append('User-Agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/109.0');
-      // headers.append('Accept', '*/*');
-      // headers.append('Accept-Language', 'en-US,en;q=0.5');
-      // headers.append('Accept-Encoding', 'gzip, deflate, br');
-      // headers.append('Referer', 'http://localhost:8080/');
-      // headers.append('Origin', 'http://localhost:8080');
-      // headers.append('Connection', 'keep-alive');
-      // headers.append('Sec-Fetch-Dest', 'empty');
-      // headers.append('Sec-Fetch-Mode', 'cors');
-      // headers.append('Sec-Fetch-Site', 'same-site');
-      // headers.append('Pragma', 'no-cache');
-      // headers.append('Cache-Control', 'no-cache');
-      // headers.append('token', this.token);
 
       fetch('http://localhost:8001/intrusion-detection/updatesettings/?token='+this.token, {
         method: 'POST',
@@ -307,12 +290,52 @@ export default {
         .then(data => {
           console.log('Upload successful:', data);
           this.selectedFile = null;
-          this.$forceUpdate();
-          this.last_settings_updated = Date.now();
+          if (this.newSettings['backend_view']['new_video_file']){
+            this.$forceUpdate();
+            this.last_settings_updated = Date.now();
+          }
+
         })
         .catch(error => {
           console.error('Upload failed:', error);
         });
+    },
+
+    async getStatus() {
+      try {
+        const response = await fetch('http://localhost:8001/intrusion-detection/status/?token='+this.token);
+        if (!response.ok) {
+          throw new Error(`API request failed with status ${response.status}`);
+        }
+        const data = await response.json();
+        console.log("status: ", data);
+        this.status = data.status; 
+        if (data['warnings'].length>0){ 
+          
+          let warning = data['warnings'][0];
+          this.notificationText = `${warning["updated_at"]} Object(s) has crossed the line: ${warning.objs.replace(",", ", ")}`
+          console.log("show notification: "+ this.notificationText);
+          this.showNotification = true;
+        }
+        
+      } catch (error) {
+        console.error('Error fetching status:', error);
+      }
+    },
+    closeNotification(){
+      this.showNotification=false;
+      fetch('http://localhost:8001/intrusion-detection/clearwarning/?token='+this.token, {
+        method: 'GET',
+        // headers: headers,
+      })
+        .then(response => response.json())
+        .then(data => {
+          console.log("clear warning:", data);
+        })
+        .catch(error => {
+          console.error('clear warning:', error);
+        });      
+      
     }
 
   },
@@ -322,6 +345,9 @@ export default {
       this.i18n.locale = "ar";
       this.$rtl.enableRTL();
     }
+    this.getStatus();
+    this.intervalId = setInterval(this.getStatus, 2000);
+
   },
   created(){
 
@@ -331,6 +357,7 @@ export default {
       this.i18n.locale = "en";
       this.$rtl.disableRTL();
     }
+    clearInterval(this.intervalId);
   },
 };
 

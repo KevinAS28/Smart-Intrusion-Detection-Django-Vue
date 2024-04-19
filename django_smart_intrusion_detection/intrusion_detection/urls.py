@@ -24,4 +24,7 @@ urlpatterns = [
     path('updatesettings/', update_settings),
     path('modellist/', get_model_list),
     path('usersettings/', get_user_settings),
+    path('usersettings/', get_user_settings),
+    path('clearwarning/', clear_obj_warning),
+    path('status/', get_status),
 ]

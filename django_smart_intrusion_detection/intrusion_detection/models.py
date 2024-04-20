@@ -27,7 +27,7 @@ class InferenceSettings(models.Model):
 
     def get_line_invert(self):
         _,_,_, invert = self.overlay_line.split('_')
-        return bool(invert)
+        return True if invert=='1' else False
     
     def get_line_orientation(self):
         orientation, _,_,_ = self.overlay_line.split('_')

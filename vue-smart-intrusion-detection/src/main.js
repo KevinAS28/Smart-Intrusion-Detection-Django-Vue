@@ -3,14 +3,14 @@ import VueRouter from "vue-router";
 import RouterPrefetch from "vue-router-prefetch";
 import App from "./App";
 import router from "./router/index";
-import { BootstrapVue, IconsPlugin } from 'bootstrap-vue'
+import { BootstrapVue, IconsPlugin, BootstrapVueIcons } from 'bootstrap-vue'
 // Import Bootstrap and BootstrapVue CSS files (order is important)
 import 'bootstrap/dist/css/bootstrap.css'
 import 'bootstrap-vue/dist/bootstrap-vue.css'
 import mainSID from "./plugins/mainSID";
 
-Vue.use(BootstrapVue)
-
+Vue.use(BootstrapVue);
+Vue.use(BootstrapVueIcons);
 Vue.use(IconsPlugin)
 Vue.use(mainSID);
 Vue.use(VueRouter);

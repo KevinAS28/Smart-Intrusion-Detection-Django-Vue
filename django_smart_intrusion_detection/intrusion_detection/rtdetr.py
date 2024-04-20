@@ -28,28 +28,26 @@ def isjson(json_content):
         return False
     
 def line_to_box(line, img_shape, line_type='h', invert=False):
-  print('line2bbox 0:', line, line_type)
+  # print('line2bbox 0:', line, line_type)
   line = list(line)
   if line_type=='h':
     if not invert: # [0, 400]
-      line.append(img_shape[0])
-      line.append(img_shape[1]) # [0, 400, 640, 640]
+      line = [0, line[1], img_shape[0], img_shape[1]] # [0, 400, 640, 640]
     else: # [0, 400]
       line = [0, line[0], img_shape[0], line[1]] # [0, 0, 400, 640]
   elif line_type=='v':
     if not invert: # [400, 0]
-      line.append(img_shape[0]) 
-      line.append(img_shape[1]) # [400]
+      line = [line[0], 0, img_shape[0], img_shape[1]] # [400, 0, 640, 640]
     else:
       line = [0, 0, line[0], img_shape[1]] # [0, 0, 400, 640]
   else:
     raise ValueError(f'Line type {line_type} is not supported')  
   
-  print('line2bbox 1:', line)
+  # print('line2bbox 1:', line)
   x1, y1, x2, y2 = line # 640, 0, 0, 640 | 0, 300, 200, 0
   if x1>x2 or y1>y2:
     return [x2, y2, x1, y1]  # Swap coords
-  print('line2bbox 2:', line)
+  # print('line2bbox 2:', line)
   return line
                                
 def rectangles_intersect(rect0, rect1, invert=False):
@@ -100,7 +98,7 @@ def add_overlay(img, rect, channel_index, color_value, alpha=0.5, invert=False):
 def frame_overlay(lines, frame, invert=False):
     for ln in lines:
         ln_type, ln = ln[0], ln[1:]
-        print('frame_overlay line:', ln)
+        # print('frame_overlay line:', ln)
         ln_bx = line_to_box(ln, frame.shape, ln_type, False)
         frame = add_overlay(frame, ln_bx, 0, 255, 0.25, invert)
 
@@ -110,7 +108,7 @@ def object_warnings(frame, lines, all_slb, objects_to_warn=['person'], invert=Fa
     for s, l, b in all_slb:
       for ln in lines:
           ln_type, ln = ln[0], ln[1:]   
-          print('objects_warning line:', ln)
+          # print('objects_warning line:', ln)
           ln_bbox = line_to_box(ln, frame.shape, line_type=ln_type, invert=invert) 
           obj_crossed = False
           if l in objects_to_warn:

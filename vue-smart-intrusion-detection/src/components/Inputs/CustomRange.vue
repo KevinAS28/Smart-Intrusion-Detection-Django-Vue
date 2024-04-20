@@ -1,7 +1,8 @@
 <template>
-  <div class="custom-range-input" >
-    <b-form-input :id="`type-range`" v-model="value" type="range" :min="min" :max="max" :step="step" @input="inputChange"></b-form-input>
-    <div >{{ valueText }}{{ (value*100).toFixed(2) }}%</div>
+  <div class="custom-range-input">
+    <b-form-input :id="`type-range`" v-model="value" type="range" :min="min" :max="max" :step="step"
+      @input="inputChange"></b-form-input>
+    <div style="text-align:center;">{{ valueText }}{{ (value * 100).toFixed(2) }}%</div>
   </div>
 </template>
 
@@ -10,7 +11,7 @@ import { BFormInput } from 'bootstrap-vue';
 
 export default {
   inheritAttrs: true,
-  name: "custom-range-input",  
+  name: "custom-range-input",
   components: {
     BFormInput
   },
@@ -25,13 +26,13 @@ export default {
       type: Number,
       required: false,
       default: 1
-    },    
+    },
 
     step: {
       type: Number,
       required: false,
       default: 0.05
-    },    
+    },
 
     valueText: {
       type: String,
@@ -39,13 +40,13 @@ export default {
       default: "Value: "
     },
     storeInputName: {
-        type: String,
-        default: 'thrh',
-        required: false
-    }      
+      type: String,
+      default: 'thrh',
+      required: false
+    }
 
-    
-  },  
+
+  },
   data() {
     return {
       value: '0.5'
@@ -62,7 +63,7 @@ export default {
       }
     },
 
-    inputChange(){
+    inputChange() {
       this.$emit('store-input', "inference", this.storeInputName, parseFloat(this.value));
     },
 
@@ -71,15 +72,16 @@ export default {
 </script>
 
 <style scoped>
-.custom-range-input div{
+.custom-range-input div {
   position: relative;
-  left:0;
-  top:0;
+  left: 0;
+  top: 0;
 }
 
 .custom-range::-moz-range-thumb {
-    background-color: #6484d5;
-    
+  background-color: #6484d5;
+
 }
+
 /* Optional styling for the dropdown */
 </style>

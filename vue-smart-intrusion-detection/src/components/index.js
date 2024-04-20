@@ -1,4 +1,6 @@
 
+import CustomTable from "./CustomTable.vue";
+import CustomSideBar from "./CustomSideBar.vue";
 import CustomBaseInput from "./Inputs/CustomBaseInput.vue";
 import CustomDropDown from "./Inputs/CustomDropDown.vue";
 import CustomRange from "./Inputs/CustomRange.vue";
@@ -12,5 +14,7 @@ export {
   FileInput,
   SwitchButton,
   Card,
-  CustomBaseInput
+  CustomSideBar,
+  CustomBaseInput,
+  CustomTable
 };

@@ -28,7 +28,12 @@ export default {
     text: {
       type: String,
       required: false,
-      default: "Choose"
+      default: ""
+    },
+    listenerName: {
+      type: String,
+      required: false,
+      default: "custom-dropdown-listener"
     },
     urlItems: {
       type: String,
@@ -54,11 +59,20 @@ export default {
   },  
   data() {
     return {
-      finaltext: this.text,
+      finaltext: "Choose",
       allItems: [{"id": 1, "name": "No other items"}]
     };
   },
+  created(){
+    console.log("dropdown listener created: " + this.listenerName);
+    this.$on(this.listenerName, (text) => {
+      console.log('dropdown listener ' + this.listenerName);
+      this.text = text;
+      this.finalText = text;
+    });
+  },
   mounted() {
+    console.log("dropdown initial text:", this.text);
     // this.fetchItems(); // Fetch items on component mount
     // this.items = JSON.parse(this.items);
     if (this.stringItems.length>0) {
@@ -74,9 +88,9 @@ export default {
       console.log('dropdown no items ', this.listItems);
       this.allItems = [{"id": 1, "name": "No other items"}];
     }
-    if (this.text=="Choose"){
-        this.finaltext = this.allItems[0]["name"];
-    }    
+    if (this.text!=""){
+      this.finalText = this.text;
+    }
     console.log("allItems:", this.allItems);
   },
   methods: {
@@ -85,6 +99,9 @@ export default {
         const response = await fetch(url);
         const data = await response.json();
         this.allItems = data;
+        if (this.text==""){
+            this.finaltext = this.allItems[0]["name"];
+        }  
       } catch (error) {
         console.error('Error fetching items:', error);
       }

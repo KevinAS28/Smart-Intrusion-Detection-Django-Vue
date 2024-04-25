@@ -24,7 +24,6 @@ class MultiVideoSourceFile(object):
 
 class VideoSourceFile(object):
     def __init__(self, video_path='/home/kevin/django-vue-stream/smartdetectoralarm/out.mkv', read_all_frames=False, postprocessors=[lambda frame: cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)]):
-        video_path=0
         print('video_path:', video_path)
         self.video = cv2.VideoCapture(video_path)
         self.postprocessors = postprocessors

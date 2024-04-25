@@ -20,11 +20,12 @@ from intrusion_detection.views import *
 app_name = 'intrusion_detection'
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('videostream/', video_stream),
+    path('videolivestream/', video_live_stream),
     path('updatesettings/', update_settings),
     path('modellist/', get_model_list),
     path('usersettings/', get_user_settings),
     path('usersettings/', get_user_settings),
     path('clearwarning/', clear_obj_warning),
     path('status/', get_status),
+    path('multiframes/', multi_frames_stream),
 ]

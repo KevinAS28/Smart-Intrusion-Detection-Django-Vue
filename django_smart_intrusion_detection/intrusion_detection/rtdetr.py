@@ -100,7 +100,7 @@ def frame_overlay(lines, frame, invert=False):
         ln_type, ln = ln[0], ln[1:]
         # print('frame_overlay line:', ln)
         ln_bx = line_to_box(ln, frame.shape, ln_type, False)
-        frame = add_overlay(frame, ln_bx, 0, 255, 0.25, invert)
+        frame = add_overlay(frame, ln_bx, 2, 255, 0.25, invert)
 
     return frame
 
@@ -191,7 +191,7 @@ class RTDETROnnxDeploy(object):
                 lab_str = str(self.classes_labels[l]) if self.draw_obj_name else ''
                 scr_str = (('-' if self.draw_obj_name or self.draw_obj_conf else '') + str(round(s*100, 1))+'%') if self.draw_obj_conf else ''
                 
-                postprocessed_frame = cv2.rectangle(postprocessed_frame, tuple(b[:2]), tuple(b[2:4]), color=(0, 0, 255), thickness=2) 
+                postprocessed_frame = cv2.rectangle(postprocessed_frame, tuple(b[:2]), tuple(b[2:4]), color=(255, 0, 0), thickness=2) 
                 postprocessed_frame = cv2.putText(postprocessed_frame, f"{lab_str}{scr_str}", tuple(b[:2]), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)  
                 # if type(self.obj_warning) is str:
                 #   print("OBJ WARNING: ", self.obj_warning)
@@ -200,6 +200,7 @@ class RTDETROnnxDeploy(object):
                 self.detected_class_frame[self.classes_labels[l]] += 1        
         Thread(target=self.obj_warning, args=(postprocessed_frame, all_slb)).start()        
         postprocessed_frame = cv2.putText(postprocessed_frame, f"FPS: {self.fps:.2f}", (50,50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)  
+        postprocessed_frame = cv2.putText(postprocessed_frame, os.path.basename(self.model_path), (50,self.size-50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)  
         # if self.save_video_output:
         #     self.video_writer.write(postprocessed_frame)        
         self.eplased_time = time.time()-self.start_time

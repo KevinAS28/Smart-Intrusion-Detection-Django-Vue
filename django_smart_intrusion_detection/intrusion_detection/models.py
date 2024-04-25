@@ -39,3 +39,9 @@ class WarningNotification(models.Model):
     frame_path = models.CharField(max_length=100, default='')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)  
+
+class SystemLog(models.Model):
+    user = models.ForeignKey(ta_model.UserAuthentication, on_delete=models.DO_NOTHING)
+    created_at = models.DateTimeField(auto_now_add=True)
+    logtext = models.CharField(max_length=100)
+    

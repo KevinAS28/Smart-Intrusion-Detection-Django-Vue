@@ -44,3 +44,9 @@ def user_settings(user):
         home_settings = home_settings[0]
         
     return home_settings, inference_settings
+
+def cuslog(user, *txt):
+    txt = ' '.join([str(i) for i in txt])
+    print(txt)
+    SystemLog(user=user,logtext=txt).save()
+    

@@ -3,13 +3,13 @@
     <div>
       <b-alert variant="danger" show dismissible @dismissed="closeNotification" v-model="showNotification"
         style="position:fixed;z-index: 2;color:white; background-color:rgba(217,67,85,1); left: 50%; transform: translate(-50%, 20%);">
-        <h5 class="font-weight-bold"> Objects Crossed the Line</h5>
-        <p>{{ notificationText }}</p>
-        <p class="text-muted mb-0"> 19:08:01 </p>
+        <p class="font-weight-bold fs-4" style="color:white;"> Warning</p>
+        <p class="fs-5" style="color:white;">{{ notificationText }}</p>
+        <p class="fs-6" style="color:white;"> {{ notificationTime }} </p>
       </b-alert>
       <div>
         <template>
-          <b-sidebar v-model="showSidebar" right bg-variant="dark" text-variant="light" title="Sidebar Title" shadow>
+          <b-sidebar v-model="showSidebar" right bg-variant="dark" text-variant="light" :title="sidebarTitle" shadow>
 
             <div class="col px-3 py-2" v-show="showSettingsContent">
               <p>
@@ -19,19 +19,19 @@
             </div>
 
             <div class="px-3 py-2" v-show="showNotificationContent">
-
               <template>
-
                 <div>
-                  <div v-for="(imgUrl, index) in warningImgs" :key="index" class="row">
+                  <div v-for="(item, index) in warnings" :key="index" class="row">
                     <div class="col-sm">
                       <card type="primary">
                         <div class="row">
                           <div class="" :class="isRTL ? 'text-right' : 'text-left'">
+                            <p style="color:text;" class="fs-5">{{ timestampToStr(item[index][2]) }}</p>
+                            <p style="color:text;" class="fs-2">"{{ item[index][1] }}" crossed the line</p>
                             <div style="width:100%;text-align:center;">
-                              <img :src="imgUrl" alt="Warning Image" class="img-fluid" style="width:60%;" />
-                            </div>
+                              <img :src="item[index][0]" alt="Warning Image" class="img-fluid" style="width:60%;" />
 
+                            </div>
                           </div>
                         </div>
                       </card>
@@ -109,7 +109,7 @@
                   <!-- <h5 class="card-category">
                   {{ $t("dashboard.totalShipments") }}
                 </h5> -->
-                  <h2 class="card-title">Live Camera</h2>
+                  <h2 class="card-title"><i class="tim-icons icon-camera-18 text-info"></i> Live Camera</h2>
                 </div>
                 <!-- <div class="col-sm-6">
                 <div
@@ -138,13 +138,29 @@
               </div>
             </template>
             <div style="text-align: center;">
-
-              <img class="camera-stream" style="-webkit-user-select: none;" ref="videoElement"
-                :src="'http://localhost:8001/intrusion-detection/videostream/?token=' + token + '&last_settings_updated=' + last_settings_updated"
+              <img class="camera-stream" ref="videoElement" :src="videoSrc1"
                 :style="{ width: camImageWidth + 'px', height: camImageHeight + 'px' }">
+              <div style="margin-left:50px;position:relative;display:inline-block;"></div>
+              <img class="camera-stream" ref="videoElement" :src="videoSrc0"
+                :style="{ width: camImageWidth + 'px', height: camImageHeight + 'px' }">
+
+              <div style="margin-left:50px;position:relative;display:inline-block;vertical-align: middle;"></div>
+              <div style="position: relative;display: inline-block;vertical-align:middle;">
+                <div class="terminal" style="width:300px;height:450px;">
+                  <div class="prompt">System Log </div>
+                  <pre v-for="line in commandHistory" :key="line"
+                    style="color:white;text-align:left;height:30px;">{{ line }}</pre>
+                  <div class="input-line">
+                    <span class="cursor"></span>
+                    <!-- <input type="text" v-model="userInput" @keyup.enter="handleCommand"
+                    style="background-color:rgba(0,0,0,0);border: none;color:white;" /> -->
+                  </div>
+                </div>
+              </div>
+
               <div class="cam-controls">
-                <b-button variant="outline-dark" @click="camZoomIn">Zoom In</b-button>
-                <b-button variant="outline-dark" @click="camZoomOut">Zoom Out</b-button>
+                <!-- <b-button variant="outline-dark" @click="camZoomIn">Zoom In</b-button>
+                <b-button variant="outline-dark" @click="camZoomOut">Zoom Out</b-button> -->
                 <!-- <button @click="camZoomIn">Zoom In</button> -->
                 <!-- <div style="width:100px;"></div> -->
 
@@ -204,11 +220,11 @@
                 @store-input="getInput" store-input-name="line_orientation" />
 
               <hr style="position:relative;margin-top: 25px; margin-bottom: 25px;height:1px; background-color: white;" />
-              <p style="position:; width:100%; display:inline-block;text-align:center;">Line Point</p>
+              <p style="position:; width:100%; display:inline-block;text-align:center;">Line Point (Percentage)</p>
               <div>
                 <div style="float: left; width:50%; padding-left:30px; position:relative;">
                   <p style="position:relative; width:fit-content; display:inline-block; right:20px;">X:</p>
-                  <b-form-input v-model="point1X" :id="`type-number`" type="number" min="0" max="640"
+                  <b-form-input v-model="point1X" :id="`type-number`" type="number" min="0" max="100"
                     style="width: 80%;display:inline;position:relative; background-color:rgba(0,0,0,0);"
                     :disabled="disabledPoint1X"></b-form-input>
 
@@ -217,7 +233,7 @@
                   <p
                     style="position:relative; width:fit-content; display:inline-block; right:20px; background-color:rgba(0,0,0,0);">
                     Y:</p>
-                  <b-form-input v-model="point1Y" :id="`type-number`" type="number" min="0" max="640"
+                  <b-form-input v-model="point1Y" :id="`type-number`" type="number" min="0" max="100"
                     style="width: 80%;display:inline;position:relative; background-color:rgba(0,0,0,0);"
                     :disabled="disabledPoint1Y"></b-form-input>
                 </div>
@@ -309,6 +325,7 @@ export default {
       showNotificationContent: false,
 
       notificationText: "Nothing",
+      notificationTime: "",
       showNotification: false,
 
       camImageWidth: this.camInitialWidth,
@@ -342,7 +359,12 @@ export default {
 
       last_settings_updated: Date.now(),
       objects_to_warn: 'person,bicycle',
-      warningImgs: []
+      warnings: [],
+      videoSrc0: '',
+      videoSrc1: '',
+      srcSize: 640,
+      userInput: "",
+      commandHistory: ["Disconnected from the backend", "Make sure the backend is running"],
     };
   },
   computed: {
@@ -355,6 +377,9 @@ export default {
   },
 
   methods: {
+    percentFormatter(value) {
+      return value + " %";
+    },
     getInput(group, key, value) {
       if (group == "file") {
         this.newFiles[key] = value;
@@ -393,7 +418,7 @@ export default {
       const formData = new FormData();
 
       if (("line_orientation" in this.newSettings["inference"])) {
-        let line = `${this.newSettings["inference"]["line_orientation"][0].toLowerCase()}_${this.point1X}_${this.point1Y}_${this.newSettings["inference"]["invert_line"]}`;
+        let line = `${this.newSettings["inference"]["line_orientation"][0].toLowerCase()}_${this.point1X / 100 * this.srcSize}_${this.point1Y / 100 * this.srcSize}_${this.newSettings["inference"]["invert_line"]}`;
         console.log("line", line);
         this.newSettings["inference"]["overlay_line"] = line;
         this.newSettings["inference"]["objects_to_warn"] = this.objects_to_warn;
@@ -424,15 +449,15 @@ export default {
             this.$forceUpdate();
             this.last_settings_updated = Date.now();
             location.reload();
-
           }
-
         })
         .catch(error => {
           console.error('Upload failed:', error);
         });
     },
-
+    timestampToStr(timestamp, format = "YYYY-MM-DD HH:mm:ss") {
+      return moment.utc(timestamp * 1000).tz('Asia/Jakarta').format(format);
+    },
     async getStatus() {
       try {
         const response = await fetch('http://localhost:8001/intrusion-detection/status/?token=' + this.token);
@@ -445,12 +470,14 @@ export default {
         if (data['warnings'].length > 0) {
 
           let warning = data['warnings'][0];
-          let notificationTime = moment.utc(warning["updated_at"] * 1000).tz('Asia/Jakarta').format("YYYY-MM-DD HH:mm:ss");;
-          this.notificationText = `${notificationTime} Object(s) has crossed the line: ${warning.objs.replace(",", ", ")}`
+          let notificationTime = moment.utc(warning["updated_at"] * 1000).tz('Asia/Jakarta').format("HH:mm:ss");
+          this.notificationText = `Objects "${warning.objs.replace(",", ", ")}" crossed the red line`;
+          this.notificationTime = notificationTime;
           console.log("show notification: " + this.notificationText + " " + warning["updated_at"]);
-          this.warningImgs[0] = warning["frame_path"];
+          this.warnings[0] = [[warning["frame_path"], warning["objs"], warning["updated_at"]]];
           this.showNotification = true;
         }
+        this.commandHistory = data["logs"];
 
       } catch (error) {
         console.error('Error fetching status:', error);
@@ -506,6 +533,7 @@ export default {
           console.log("user settings:", data);
           this.$emit("choose_model", data["inference_settings"]["model_name"]);
           this.sideBarTableItems = this.userSettingsToTable(data);
+          this.srcSize = data["inference_settings"]["size"];
           // this.modelName = data["inference_settings"]["model_name"];
           // size = data["inference_settings"]["size"];
           // thrh = data["inference_settings"]["thrh"];
@@ -523,7 +551,7 @@ export default {
       this.showNotificationContent = false;
       this.showSidebar = !this.showSidebar;
       this.showSettingsContent = this.showSidebar ? true : false;
-
+      this.sidebarTitle = "Inference Settings";
 
     },
     toggleNotifSidebar() {
@@ -531,9 +559,22 @@ export default {
       this.showSettingsContent = false;
       this.showSidebar = !this.showSidebar;
       this.showNotificationContent = this.showSidebar ? true : false;
-
-    }
-
+      this.sidebarTitle = "Detailed Notification";
+    },
+    handleCommand() {
+      const command = this.userInput.trim();
+      if (command) {
+        this.commandHistory.push(command);
+        this.commandHistory.push(this.processCommand(command)); // Simulate command execution
+        this.userInput = "";
+      }
+    },
+    processCommand(command) {
+      // Implement logic to handle different commands
+      // (e.g., display a message, update data)
+      // For now, simply return a generic response
+      return `$ ${command}`;
+    },
   },
   mounted() {
     this.i18n = this.$i18n;
@@ -542,8 +583,11 @@ export default {
       this.$rtl.enableRTL();
     }
     this.getStatus();
-    this.intervalId = setInterval(this.getStatus, 2000);
-
+    this.intervalId = setInterval(this.getStatus, 500);
+    this.videoSrc0 = 'http://localhost:8001/intrusion-detection/videolivestream/?stored=0&postprocessor_index=0&token=' + this.token + '&last_settings_updated=' + this.last_settings_updated;
+    setTimeout(() => {
+      this.videoSrc1 = 'http://localhost:8001/intrusion-detection/videolivestream/?stored=1&postprocessor_index=1&token=' + this.token + '&last_settings_updated=' + this.last_settings_updated;
+    }, 500);
   },
   created() {
     this.getUserSettings();
@@ -584,5 +628,48 @@ p {
 
 .b-sidebar {
   width: 40%;
+}
+
+.terminal {
+  font-family: monospace;
+  background-color: #000;
+  color: #fff;
+  padding: 1em;
+  overflow-y: scroll;
+  border-radius: 5px;
+  overflow-x: hidden;
+  /* Added to prevent horizontal scrolling */
+  white-space: pre-wrap;
+}
+
+.prompt {
+  color: #00c6ff;
+  display: inline-block;
+}
+
+.input-line {
+  display: flex;
+  margin-top: 0.5em;
+}
+
+.cursor {
+  background-color: #fff;
+  width: 1px;
+  height: 1em;
+  animation: blink 0.5s infinite alternate;
+}
+
+@keyframes blink {
+  from {
+    opacity: 1;
+  }
+
+  to {
+    opacity: 0;
+  }
+}
+
+pre {
+  margin-top: 0.5em;
 }
 </style>

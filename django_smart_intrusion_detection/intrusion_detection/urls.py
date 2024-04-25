@@ -28,4 +28,5 @@ urlpatterns = [
     path('clearwarning/', clear_obj_warning),
     path('status/', get_status),
     path('multiframes/', multi_frames_stream),
+    path('login/', login),
 ]

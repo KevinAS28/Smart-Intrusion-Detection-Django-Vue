@@ -15,7 +15,7 @@ from intrusion_detection.models import *
 from intrusion_detection.video_source import *
 from intrusion_detection.utils import *
 from intrusion_detection.rtdetr import RTDETROnnxDeploy, is_bbox_intersection, line_to_box
-from token_authentication.auth_core import token_auth
+from token_authentication.auth_core import token_auth, token_get
 from token_authentication import models as ta_models
 
 SystemLog.objects.all().delete()
@@ -200,3 +200,9 @@ def clear_obj_warning(user, request):
             os.remove(frame_path)
         warn.delete()
     return JsonResponse({'deleted': len(all_warnings)})
+
+def login(request):
+    username = request.POST['username']
+    password = request.POST['password']
+    token = token_get(username, password)
+    return JsonResponse({'token': token})

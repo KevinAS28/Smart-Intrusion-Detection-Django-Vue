@@ -46,8 +46,6 @@ def login(*args, **kwargs):
 def token_get(username, password):
     try:
         user = models.UserAuthentication.objects.get(username=username, password=password)
-        # role = models.UserRole.objects.get(id=user.role)
-        # print(
         token = (auth_util.token_hash((username+password+str(datetime.now())).encode('utf-8')))
         user.token = token
         user.token_expired = models.get_token_expire()

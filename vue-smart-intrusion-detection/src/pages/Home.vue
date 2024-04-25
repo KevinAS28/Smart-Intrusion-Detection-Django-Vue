@@ -86,10 +86,10 @@
               <b-nav-item-dropdown right>
 
                 <template #button-content>
-                  <em>User</em>
+                  <em>{{ username }}</em>
                 </template>
                 <b-dropdown-item href="#">Profile</b-dropdown-item>
-                <b-dropdown-item href="#">Sign Out</b-dropdown-item>
+                <b-dropdown-item href="#" @click="signOut">Sign Out</b-dropdown-item>
               </b-nav-item-dropdown>
             </b-navbar-nav>
           </b-collapse>
@@ -317,7 +317,8 @@ export default {
   },
   data() {
     return {
-      token: "165805894906728e2813aa9c700155c3299e040df9a94958251514b8aca4db25143bca0caa5d01edb5fb3e35a64e1857",
+      username: "",
+      token: "",
 
       showSidebar: false,
       sidebarTitle: "Inference Settings",
@@ -377,6 +378,11 @@ export default {
   },
 
   methods: {
+    signOut() {
+      localStorage.setItem("token", "");
+      this.token = "";
+      this.$router.push("/login");
+    },
     percentFormatter(value) {
       return value + " %";
     },
@@ -577,6 +583,7 @@ export default {
     },
   },
   mounted() {
+    document.title = "Dashboard";
     this.i18n = this.$i18n;
     if (this.enableRTL) {
       this.i18n.locale = "ar";
@@ -590,6 +597,11 @@ export default {
     }, 500);
   },
   created() {
+    this.token = localStorage.getItem("token");
+    if (this.token == "" || this.token == false) {
+      this.$router.push("/login");
+    }
+    this.username = localStorage.getItem("username");
     this.getUserSettings();
   },
   beforeDestroy() {

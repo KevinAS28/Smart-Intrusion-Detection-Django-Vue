@@ -1,10 +1,12 @@
+import datetime
 from django.db import models
 from token_authentication import models as ta_model
 # Create your models here.
 class HomeSettings(models.Model):
     user = models.ForeignKey(ta_model.UserAuthentication, on_delete=models.DO_NOTHING)
     video_file = models.CharField(max_length=200, null=True, blank=True)
-
+    warning_time_start = models.TimeField(default=datetime.time(hour=0, minute=0, second=0))
+    warning_time_end = models.TimeField(default=datetime.time(hour=0, minute=0, second=0))
 
 class InferenceSettings(models.Model):
     user = models.ForeignKey(ta_model.UserAuthentication, on_delete=models.DO_NOTHING)
@@ -45,3 +47,4 @@ class SystemLog(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     logtext = models.CharField(max_length=100)
     
+        

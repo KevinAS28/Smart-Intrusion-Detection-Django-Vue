@@ -262,8 +262,26 @@
                   @store-input="getInput" store-input-name="invert_line" />
               </div>
               <hr style="position:relative;margin-top: 25px; margin-bottom: 25px;height:1px;background-color: white;" />
+              <p style="position:; width:100%; display:inline-block;text-align:center;">Objects to alert (comma seperated)
+              </p>
               <b-form-input v-model="objects_to_warn" :id="`type-text`" type="text"
                 style="width: 50%;text-align:center; position:relative; display: block; margin-left: auto; margin-right: auto; background-color:rgba(0,0,0,0);"></b-form-input>
+              <hr style="position:relative;margin-top: 25px; margin-bottom: 25px;height:1px;background-color: white;" />
+              <div>
+                <p style="position:; width:100%; display:inline-block;text-align:center;">Alert at time between:</p>
+                <div style="float: left; width:50%; padding-left:30px; position:relative;">
+                  <p style="position:relative; width:fit-content; display:inline-block; right:20px;">Start:</p>
+                  <b-form-input v-model="warning_time_start" type="time" placeholder="Enter time" required
+                    style="width:75%; text-align:center; position:relative; display: inline; background-color:rgba(0,0,0,0);" />
+                </div>
+                <div style="float: right; align: right; width:50%; padding-left:30px; position:relative; display:inline;">
+                  <p
+                    style="position:relative; width:fit-content; display:inline-block; right:20px; background-color:rgba(0,0,0,0);">
+                    End:</p>
+                  <b-form-input v-model="warning_time_end" type="time" placeholder="Enter time" required
+                    style="width:75%; text-align:center; position:relative; display: inline; background-color:rgba(0,0,0,0);" />
+                </div>
+              </div>
             </div>
           </card>
         </div>
@@ -342,7 +360,9 @@ export default {
 
         },
         'backend_view': {
-          'new_video_file': false
+          'new_video_file': false,
+          'warning_time_start': '',
+          'warning_time_end': '',
         }
       },
       newFiles: {
@@ -357,7 +377,8 @@ export default {
       point1Y: 0,
       disabledPoint1X: true,
       disabledPoint1Y: true,
-
+      warning_time_start: '00:00',
+      warning_time_end: '00:00',
       last_settings_updated: Date.now(),
       objects_to_warn: 'person,bicycle',
       warnings: [],
@@ -422,20 +443,23 @@ export default {
 
     updateSettings() {
       const formData = new FormData();
+      if (this.warning_time_start != "" && this.warning_time_end != "") {
+        this.newSettings["backend_view"]["warning_time_start"] = this.warning_time_start;
+        this.newSettings["backend_view"]["warning_time_end"] = this.warning_time_end;
+      }
 
       if (("line_orientation" in this.newSettings["inference"])) {
         let line = `${this.newSettings["inference"]["line_orientation"][0].toLowerCase()}_${this.point1X / 100 * this.srcSize}_${this.point1Y / 100 * this.srcSize}_${this.newSettings["inference"]["invert_line"]}`;
         console.log("line", line);
         this.newSettings["inference"]["overlay_line"] = line;
         this.newSettings["inference"]["objects_to_warn"] = this.objects_to_warn;
-
       }
       else {
         console.log("No new line");
       }
-
-
-      formData.append("new_settings", JSON.stringify(this.newSettings));
+      let allNewSettings = JSON.stringify(this.newSettings);
+      console.log("all new setings:", allNewSettings);
+      formData.append("new_settings", allNewSettings);
       for (const [key, value] of Object.entries(this.newFiles)) {
         console.log("adding file " + key + " to form");
         formData.append(key, value);
@@ -594,7 +618,7 @@ export default {
     this.videoSrc0 = 'http://localhost:8001/intrusion-detection/videolivestream/?stored=0&postprocessor_index=0&token=' + this.token + '&last_settings_updated=' + this.last_settings_updated;
     setTimeout(() => {
       this.videoSrc1 = 'http://localhost:8001/intrusion-detection/videolivestream/?stored=1&postprocessor_index=1&token=' + this.token + '&last_settings_updated=' + this.last_settings_updated;
-    }, 500);
+    }, 1000);
   },
   created() {
     this.token = localStorage.getItem("token");

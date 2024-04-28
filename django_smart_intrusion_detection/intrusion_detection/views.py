@@ -1,4 +1,6 @@
 import time
+from datetime import datetime as dt
+import re
 import os
 import json
 import base64
@@ -6,14 +8,12 @@ import base64
 import cv2
 
 from django.conf import settings
-from django.shortcuts import render
-from django.http import HttpResponse, StreamingHttpResponse, JsonResponse
+from django.http import StreamingHttpResponse, JsonResponse
 from django.forms.models import model_to_dict
-from django.contrib.staticfiles.storage import staticfiles_storage
 
-from intrusion_detection.models import *
-from intrusion_detection.video_source import *
-from intrusion_detection.utils import *
+from intrusion_detection.models import WarningNotification, SystemLog
+from intrusion_detection.video_source import VideoSourceFile, MultiVideoSourceFile, NotFoundSource
+from intrusion_detection.utils import cuslog, user_settings, update_dict, custom_model2todict
 from intrusion_detection.rtdetr import RTDETROnnxDeploy, is_bbox_intersection, line_to_box
 from token_authentication.auth_core import token_auth, token_get
 from token_authentication import models as ta_models
@@ -26,21 +26,24 @@ if (settings.DEBUG and settings.ISRUNNING_DEVSERVER) or not settings.DEBUG:
     default_rtdetr_model = RTDETROnnxDeploy(model_path=os.path.join(settings.BASE_DIR, 'rtdetr_yolov9bb_ep27.onnx'), classes_labels=os.path.join(settings.BASE_DIR, 'inference_class_labels.json'), sample_img=cv2.imread(os.path.join(settings.BASE_DIR, 'img.jpg')))
     user_models = dict()
     user_streams = dict()
+    user_videowriters = dict()
 
 def custom_object_warnings(frame, lines, all_slb, objects_to_warn=['person'], invert=False, user=None):
     # print('custom_object_warnings(0):', lines, objects_to_warn)
     all_crossed_objects = []
-    for s, l, b in all_slb:
-      for ln in lines:
-          ln_type, ln = ln[0], ln[1:]    
-          ln_bbox = line_to_box(ln, frame.shape, line_type=ln_type, invert=invert) 
-        #   print('custom_object_warnings(1):', l, invert, b, ln_bbox, objects_to_warn, l in objects_to_warn, is_bbox_intersection(b, ln_bbox))
-          obj_crossed = False
-          if l in objects_to_warn:
-              obj_crossed = is_bbox_intersection(b, ln_bbox)
-              if obj_crossed:
-                print(f'WARNING: OBJECT {l} HAS CROSSED THE LINE')      
-                all_crossed_objects.append(l)
+    home_settings, _ = user_settings(user)
+    if home_settings.warning_time_start < dt.now().time() < home_settings.warning_time_end:
+        for s, l, b in all_slb:
+            for ln in lines:
+                ln_type, ln = ln[0], ln[1:]    
+                ln_bbox = line_to_box(ln, frame.shape, line_type=ln_type, invert=invert) 
+                #   print('custom_object_warnings(1):', l, invert, b, ln_bbox, objects_to_warn, l in objects_to_warn, is_bbox_intersection(b, ln_bbox))
+                obj_crossed = False
+                if l in objects_to_warn:                    
+                    obj_crossed = is_bbox_intersection(b, ln_bbox)
+                    if obj_crossed:
+                        print(f'WARNING: OBJECT {l} HAS CROSSED THE LINE')      
+                        all_crossed_objects.append(l)
 
     if len(all_crossed_objects)>0:
         existing_warn_notif = WarningNotification.objects.filter(user=user)
@@ -49,6 +52,27 @@ def custom_object_warnings(frame, lines, all_slb, objects_to_warn=['person'], in
             cv2.imwrite(frame_path, frame)        
             warn_notif = WarningNotification(user=user, objs=','.join(all_crossed_objects), frame_path=frame_path)        
             warn_notif.save()
+        
+        
+        video_path = os.path.join(settings.MEDIA_DIR_PATH, f'{time.time()}_{"-".join(all_crossed_objects)}.mkv')
+        if not (user.username in user_videowriters):
+            cuslog(user, f'Starting recording to {video_path}')
+            fourcc_code = cv2.VideoWriter_fourcc(*'XVID')
+            user_videowriters[user.username] = [cv2.VideoWriter(video_path, fourcc_code, 6.0, (frame.shape[0], frame.shape[1])), time.time()]
+
+        user_videowriters[user.username][0].write(frame)
+        user_videowriters[user.username][1] = time.time()
+    else:
+        if (user.username in user_videowriters):
+            seconds_gap = time.time()-user_videowriters[user.username][1]
+            print('seconds gap:', seconds_gap)
+            if seconds_gap>20:                
+                cuslog(user, f'Stopping recording...')
+                user_videowriters[user.username][0].release()
+                del user_videowriters[user.username]
+            else:
+                user_videowriters[user.username][0].write(frame)
+        
 
 def gen(video_source, postprocessor_index, stored=False):
     while True:
@@ -137,7 +161,12 @@ def update_settings(user, request):
             home_settings.video_file = video_path 
             if user.username in user_streams:
                 del user_streams[user.username]
-        
+        elif setting_key=='warning_time_start' and re.search(r'[\d]+', setting_val):
+            home_settings.warning_time_start = dt.strptime(setting_val, "%H:%M").time()
+        elif setting_key=='warning_time_end' and re.search(r'[\d]+', setting_val):
+            home_settings.warning_time_end = dt.strptime(setting_val, "%H:%M").time()            
+        else:
+            setattr(home_settings, setting_key, setting_val)
     home_settings.save()                     
     
     # handle update inference settings

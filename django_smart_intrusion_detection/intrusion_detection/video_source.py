@@ -1,3 +1,5 @@
+from threading import Thread
+import time
 import cv2, numpy as np
 
 class MultiVideoSourceFile(object):
@@ -20,7 +22,6 @@ class MultiVideoSourceFile(object):
             frames.append(cv2.imencode('.jpg', frame)[1])
         return frames
                  
-        
 
 class VideoSourceFile(object):
     def __init__(self, video_path='/home/kevin/django-vue-stream/smartdetectoralarm/out.mkv', read_all_frames=False, postprocessors=[lambda frame: cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)]):
@@ -65,6 +66,61 @@ class VideoSourceFile(object):
         if store:
             self.frames = [image]
         return cv2.imencode('.jpg', self.postprocessors[postprocessor_index](image))[1].tobytes()
+
+class SimulatedVideoSourceFile(object):
+    def __init__(self, video_path='/home/kevin/django-vue-stream/smartdetectoralarm/out.mkv', fps=30, max_live_frame_stack=2, postprocessors=[lambda frame: cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)]):
+        print('video_path:', video_path)
+        self.postprocessors = postprocessors
+        self.frame_index = 0
+        self.video_path = video_path
+        self.fps = fps
+        self.max_live_frame_stack = max_live_frame_stack
+        self.is_live_simulation_running = False
+        self.is_live_simulation_stopped = False
+        self.live_frames = [None]*max_live_frame_stack
+        self.live_frame_index = 0
+        Thread(target=self.simulate_live_video, args=[]).start()
+    
+    def __del__(self):
+        self.is_live_simulation_running=False
+        while not self.is_live_simulation_stopped:
+            time.sleep(0.1)
+        self.video.release()
+
+    def simulate_live_video(self):
+        self.video = cv2.VideoCapture(self.video_path)
+        self.is_live_simulation_stopped = False
+        self.is_live_simulation_running = True
+        while self.is_live_simulation_running:
+            success, image = self.video.read()    
+            if not success:
+                self.video = cv2.VideoCapture(self.video_path)
+                success, image = self.video.read()    
+            if not success:
+                raise RuntimeError(f'Even after the video reinitialized, still cannot get the frame: {self.video_path}')
+            self.live_frames[self.live_frame_index] = image
+            self.live_frame_index += 1
+            if self.live_frame_index==self.max_live_frame_stack:
+                self.live_frame_index = 0
+            time.sleep(1.0/self.fps)
+        self.is_live_simulation_stopped = True
+    
+    def get_frames(self, postprocessor_index=0):
+        postprocessed_frames = []
+        for frame in self.live_frames:
+            processed_frame = cv2.imencode('.jpg', self.postprocessors[postprocessor_index](frame))[1].tobytes()
+            postprocessed_frames.append(processed_frame)
+        return postprocessed_frames
+
+    def get_live_frame(self,postprocessor_index=0):
+        while self.live_frames[self.live_frame_index] is None:
+            time.sleep(0.1)
+        return cv2.imencode('.jpg', self.postprocessors[postprocessor_index](self.live_frames[self.live_frame_index]))[1].tobytes()
+    
+    def get_stored_frame(self, *args, **kwargs):
+        return self.get_live_frame(*args, **kwargs)
+    
+
 
 class NotFoundSource(object):
     def __init__(self, text, size=640):

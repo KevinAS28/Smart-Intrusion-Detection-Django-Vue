@@ -7,7 +7,8 @@ class HomeSettings(models.Model):
     video_file = models.CharField(max_length=200, null=True, blank=True)
     warning_time_start = models.TimeField(default=datetime.time(hour=0, minute=0, second=0))
     warning_time_end = models.TimeField(default=datetime.time(hour=0, minute=0, second=0))
-
+    fps = models.IntegerField(default=20)
+    
 class InferenceSettings(models.Model):
     user = models.ForeignKey(ta_model.UserAuthentication, on_delete=models.DO_NOTHING)
     model_name = models.CharField(max_length=100, default='rtdetr_yolov9bb_ep27.onnx')

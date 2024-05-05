@@ -29,4 +29,5 @@ urlpatterns = [
     path('status/', get_status),
     path('multiframes/', multi_frames_stream),
     path('login/', login),
+    path('deletestream/', delete_stream),
 ]

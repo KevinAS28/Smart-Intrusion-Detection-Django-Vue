@@ -12,7 +12,7 @@ from django.http import StreamingHttpResponse, JsonResponse
 from django.forms.models import model_to_dict
 
 from intrusion_detection.models import WarningNotification, SystemLog
-from intrusion_detection.video_source import VideoSourceFile, MultiVideoSourceFile, NotFoundSource
+from intrusion_detection.video_source import VideoSourceFile, MultiVideoSourceFile, NotFoundSource, SimulatedVideoSourceFile
 from intrusion_detection.utils import cuslog, user_settings, update_dict, custom_model2todict
 from intrusion_detection.rtdetr import RTDETROnnxDeploy, is_bbox_intersection, line_to_box
 from token_authentication.auth_core import token_auth, token_get
@@ -32,12 +32,14 @@ def custom_object_warnings(frame, lines, all_slb, objects_to_warn=['person'], in
     # print('custom_object_warnings(0):', lines, objects_to_warn)
     all_crossed_objects = []
     home_settings, _ = user_settings(user)
-    if home_settings.warning_time_start < dt.now().time() < home_settings.warning_time_end:
+    time_condition = home_settings.warning_time_start < dt.now().time() < home_settings.warning_time_end
+    # print('custom_object_warnings(1):', time_condition, home_settings.warning_time_start , dt.now().time() , home_settings.warning_time_end)
+    if time_condition:
         for s, l, b in all_slb:
             for ln in lines:
                 ln_type, ln = ln[0], ln[1:]    
                 ln_bbox = line_to_box(ln, frame.shape, line_type=ln_type, invert=invert) 
-                #   print('custom_object_warnings(1):', l, invert, b, ln_bbox, objects_to_warn, l in objects_to_warn, is_bbox_intersection(b, ln_bbox))
+                # print('custom_object_warnings(2):', l, invert, b, ln_bbox, objects_to_warn, l in objects_to_warn, is_bbox_intersection(b, ln_bbox))
                 obj_crossed = False
                 if l in objects_to_warn:                    
                     obj_crossed = is_bbox_intersection(b, ln_bbox)
@@ -58,7 +60,7 @@ def custom_object_warnings(frame, lines, all_slb, objects_to_warn=['person'], in
         if not (user.username in user_videowriters):
             cuslog(user, f'Starting recording to {video_path}')
             fourcc_code = cv2.VideoWriter_fourcc(*'XVID')
-            user_videowriters[user.username] = [cv2.VideoWriter(video_path, fourcc_code, 6.0, (frame.shape[0], frame.shape[1])), time.time()]
+            user_videowriters[user.username] = [cv2.VideoWriter(video_path, fourcc_code, home_settings.fps, (frame.shape[0], frame.shape[1])), time.time()]
 
         user_videowriters[user.username][0].write(frame)
         user_videowriters[user.username][1] = time.time()
@@ -128,7 +130,7 @@ def video_live_stream(user:ta_models.UserAuthentication, request):
         if not os.path.isfile(video_path):
             user_streams[user.username] = NotFoundSource(text=f'Please choose a video file',size=inference_settings.size)
         else:
-            user_streams[user.username] = VideoSourceFile(video_path, postprocessors=[user_model.inference_frame, lambda frame: frame])
+            user_streams[user.username] = SimulatedVideoSourceFile(video_path, fps=home_settings.fps, postprocessors=[user_model.inference_frame, lambda frame: frame])
         video_source = user_streams[user.username]
     else:
         cuslog(user, 'using existing user stream...')
@@ -165,6 +167,8 @@ def update_settings(user, request):
             home_settings.warning_time_start = dt.strptime(setting_val, "%H:%M").time()
         elif setting_key=='warning_time_end' and re.search(r'[\d]+', setting_val):
             home_settings.warning_time_end = dt.strptime(setting_val, "%H:%M").time()            
+        elif setting_key=='fps':
+            home_settings.fps = int(setting_val)
         else:
             setattr(home_settings, setting_key, setting_val)
     home_settings.save()                     
@@ -235,3 +239,10 @@ def login(request):
     password = request.POST['password']
     token = token_get(username, password)
     return JsonResponse({'token': token})
+
+@token_auth(roles=['*'], get_user=True)
+def delete_stream(user, request):
+    if user.username in user_streams:
+        del user_streams[user.username]
+    
+    return JsonResponse({'success': True})

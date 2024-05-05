@@ -295,7 +295,12 @@
               </h3>
             </template>
             <div class="chart-area">
+              <p style="position:; width:100%; display:inline-block;text-align:center;">Video File</p>
               <file-input @store-input="getInput" store-input-name="video_file" />
+              <hr style="position:relative;margin-top: 25px; margin-bottom: 25px;height:1px;background-color: white;" />
+              <p style="position:; width:100%; display:inline-block;text-align:center;">FPS</p>
+              <b-form-input v-model="fps" :id="`type-number`" type="number"
+                style="width: 30%;display:block;position:relative; margin-left:auto; margin-right:auto; background-color:rgba(0,0,0,0);"></b-form-input>
             </div>
           </card>
         </div>
@@ -381,6 +386,7 @@ export default {
       warning_time_end: '00:00',
       last_settings_updated: Date.now(),
       objects_to_warn: 'person,bicycle',
+      fps: 0,
       warnings: [],
       videoSrc0: '',
       videoSrc1: '',
@@ -457,6 +463,11 @@ export default {
       else {
         console.log("No new line");
       }
+
+      if (this.fps > 0) {
+        this.newSettings["backend_view"]["fps"] = this.fps;
+      }
+
       let allNewSettings = JSON.stringify(this.newSettings);
       console.log("all new setings:", allNewSettings);
       formData.append("new_settings", allNewSettings);
@@ -475,14 +486,26 @@ export default {
           console.log('Update settings successful:', data);
           this.selectedFile = null;
           console.log("model_name in inference", "model_name" in this.newSettings["inference"]);
-          if (this.newSettings['backend_view']['new_video_file'] || "model_name" in this.newSettings["inference"]) {
-            this.$forceUpdate();
-            this.last_settings_updated = Date.now();
-            location.reload();
+          if (this.newSettings['backend_view']['new_video_file'] || "model_name" in this.newSettings["inference"] || "fps" in this.newSettings["backend_view"]) {
+            fetch('http://localhost:8001/intrusion-detection/deletestream/?token=' + this.token, {
+              method: 'POST',
+              body: formData,
+            })
+              .then(response => response.json())
+              .then(data => {
+                console.log("delete stream:", data);
+                this.$forceUpdate();
+                this.last_settings_updated = Date.now();
+                location.reload();
+              })
+              .catch(error => {
+
+              });
+
           }
         })
         .catch(error => {
-          console.error('Upload failed:', error);
+          console.error('error:', error);
         });
     },
     timestampToStr(timestamp, format = "YYYY-MM-DD HH:mm:ss") {
